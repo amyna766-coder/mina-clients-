@@ -5,7 +5,7 @@ import CustomerForm from './components/CustomerForm';
 import CustomerList from './components/CustomerList';
 import SearchBar from './components/SearchBar';
 import StatsOverview from './components/StatsOverview';
-import { Plus, Users, Download, Upload, Share2 } from 'lucide-react';
+import { Plus, Users, Download, FileSpreadsheet } from 'lucide-react';
 
 const App: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -63,7 +63,8 @@ const App: React.FC = () => {
     setEditingCustomer(undefined);
   };
 
-  const exportData = () => {
+  const exportDataJSON = () => {
+    if (customers.length === 0) return alert('لا توجد بيانات لتصديرها');
     const dataStr = JSON.stringify(customers, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     const exportFileDefaultName = `tamween_backup_${new Date().toLocaleDateString()}.json`;
@@ -72,6 +73,38 @@ const App: React.FC = () => {
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
+  };
+
+  const exportDataCSV = () => {
+    if (customers.length === 0) return alert('لا توجد بيانات لتصديرها');
+    
+    // CSV Header
+    const headers = ["الاسم", "رقم الصفحة", "عدد الأفراد", "الرمز السري", "تاريخ الإضافة"];
+    
+    // CSV Content
+    const rows = customers.map(c => [
+      c.name,
+      c.pageNumber,
+      c.familyCount,
+      c.secretPin,
+      new Date(c.createdAt).toLocaleDateString('ar-EG')
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(e => e.join(","))
+    ].join("\n");
+
+    // Add BOM for Excel UTF-8 support
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `tamween_data_${new Date().toLocaleDateString()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filteredAndSortedCustomers = useMemo(() => {
@@ -103,9 +136,16 @@ const App: React.FC = () => {
           </div>
           <div className="flex gap-2">
             <button 
-              onClick={exportData}
+              onClick={exportDataCSV}
+              className="p-2.5 text-emerald-600 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
+              title="تصدير Excel (CSV)"
+            >
+              <FileSpreadsheet className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={exportDataJSON}
               className="p-2.5 text-sky-600 bg-sky-50 rounded-xl hover:bg-sky-100 transition-colors"
-              title="نسخة احتياطية"
+              title="نسخة احتياطية (JSON)"
             >
               <Download className="w-5 h-5" />
             </button>
