@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Customer, SortType } from './types';
 import CustomerForm from './components/CustomerForm';
 import CustomerList from './components/CustomerList';
 import SearchBar from './components/SearchBar';
 import StatsOverview from './components/StatsOverview';
-import { Plus, Users, Download, FileSpreadsheet } from 'lucide-react';
+import { Plus, Users, Download, FileSpreadsheet, Upload, SearchX } from 'lucide-react';
 
 const App: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -13,6 +13,7 @@ const App: React.FC = () => {
   const [sortType, setSortType] = useState<SortType>(SortType.LATEST);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load data
   useEffect(() => {
@@ -66,28 +67,68 @@ const App: React.FC = () => {
   const exportDataJSON = () => {
     if (customers.length === 0) return alert('لا توجد بيانات لتصديرها');
     const dataStr = JSON.stringify(customers, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = `tamween_backup_${new Date().toLocaleDateString()}.json`;
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const exportFileDefaultName = `tamween_backup_${new Date().toISOString().split('T')[0]}.json`;
 
     const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('href', url);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportJSON = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target?.result as string);
+        if (Array.isArray(importedData)) {
+          if (window.confirm('هل تريد استبدال البيانات الحالية بالبيانات المستوردة؟ (إلغاء سيقوم بدمجهم معاً)')) {
+            setCustomers(importedData);
+          } else {
+            // Merge logic: avoid duplicates based on name and pageNumber
+            setCustomers(prev => {
+              const combined = [...prev, ...importedData];
+              const unique = combined.filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
+              return unique;
+            });
+          }
+          alert('تم استيراد البيانات بنجاح');
+        } else {
+          alert('الملف غير صالح');
+        }
+      } catch (err) {
+        alert('حدث خطأ أثناء قراءة الملف');
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const exportDataCSV = () => {
     if (customers.length === 0) return alert('لا توجد بيانات لتصديرها');
     
-    // CSV Header
     const headers = ["الاسم", "رقم الصفحة", "عدد الأفراد", "الرمز السري", "تاريخ الإضافة"];
     
-    // CSV Content
+    // Improved CSV conversion to handle special characters and commas
+    const escapeCSV = (str: string | number) => {
+      const stringValue = String(str);
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
+
     const rows = customers.map(c => [
-      c.name,
-      c.pageNumber,
-      c.familyCount,
-      c.secretPin,
-      new Date(c.createdAt).toLocaleDateString('ar-EG')
+      escapeCSV(c.name),
+      escapeCSV(c.pageNumber),
+      escapeCSV(c.familyCount),
+      escapeCSV(c.secretPin),
+      escapeCSV(new Date(c.createdAt).toLocaleDateString('ar-EG'))
     ]);
 
     const csvContent = [
@@ -95,16 +136,16 @@ const App: React.FC = () => {
       ...rows.map(e => e.join(","))
     ].join("\n");
 
-    // Add BOM for Excel UTF-8 support
     const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `tamween_data_${new Date().toLocaleDateString()}.csv`);
+    link.setAttribute("download", `tamween_data_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const filteredAndSortedCustomers = useMemo(() => {
@@ -135,6 +176,20 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2">
+            <input 
+              type="file" 
+              accept=".json" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleImportJSON} 
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2.5 text-orange-600 bg-orange-50 rounded-xl hover:bg-orange-100 transition-colors"
+              title="استيراد نسخة احتياطية (JSON)"
+            >
+              <Upload className="w-5 h-5" />
+            </button>
             <button 
               onClick={exportDataCSV}
               className="p-2.5 text-emerald-600 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
@@ -145,7 +200,7 @@ const App: React.FC = () => {
             <button 
               onClick={exportDataJSON}
               className="p-2.5 text-sky-600 bg-sky-50 rounded-xl hover:bg-sky-100 transition-colors"
-              title="نسخة احتياطية (JSON)"
+              title="تصدير نسخة احتياطية (JSON)"
             >
               <Download className="w-5 h-5" />
             </button>
@@ -182,11 +237,21 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <CustomerList 
-          customers={filteredAndSortedCustomers} 
-          onDelete={deleteCustomer} 
-          onEdit={startEdit}
-        />
+        {searchQuery && filteredAndSortedCustomers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-[2rem] border border-sky-50 shadow-sm px-6">
+            <div className="bg-slate-50 p-6 rounded-full mb-4">
+              <SearchX className="w-12 h-12 text-slate-300" />
+            </div>
+            <h3 className="text-lg font-black text-sky-950">لا توجد نتائج</h3>
+            <p className="text-slate-400 text-sm mt-1">لم نجد أي عميل يطابق بحثك عن "{searchQuery}"</p>
+          </div>
+        ) : (
+          <CustomerList 
+            customers={filteredAndSortedCustomers} 
+            onDelete={deleteCustomer} 
+            onEdit={startEdit}
+          />
+        )}
       </main>
 
       {isModalOpen && (
