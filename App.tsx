@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Customer, SortType } from './types';
-import CustomerForm from './components/CustomerForm';
-import CustomerList from './components/CustomerList';
-import SearchBar from './components/SearchBar';
-import StatsOverview from './components/StatsOverview';
+import { Customer, SortType } from './types.ts';
+import CustomerForm from './components/CustomerForm.tsx';
+import CustomerList from './components/CustomerList.tsx';
+import SearchBar from './components/SearchBar.tsx';
+import StatsOverview from './components/StatsOverview.tsx';
 import { Plus, Users, Download, FileSpreadsheet, Upload, SearchX } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -15,7 +15,14 @@ const App: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load data
+  // Fallback for ID generation if crypto.randomUUID is not available
+  const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem('tamween_customers');
     if (saved) {
@@ -27,7 +34,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Save data
   useEffect(() => {
     localStorage.setItem('tamween_customers', JSON.stringify(customers));
   }, [customers]);
@@ -40,7 +46,7 @@ const App: React.FC = () => {
     } else {
       const newCustomer: Customer = {
         ...data,
-        id: crypto.randomUUID(),
+        id: generateId(),
         createdAt: Date.now()
       };
       setCustomers(prev => [newCustomer, ...prev]);
@@ -90,7 +96,6 @@ const App: React.FC = () => {
           if (window.confirm('هل تريد استبدال البيانات الحالية بالبيانات المستوردة؟ (إلغاء سيقوم بدمجهم معاً)')) {
             setCustomers(importedData);
           } else {
-            // Merge logic: avoid duplicates based on name and pageNumber
             setCustomers(prev => {
               const combined = [...prev, ...importedData];
               const unique = combined.filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
@@ -114,7 +119,6 @@ const App: React.FC = () => {
     
     const headers = ["الاسم", "رقم الصفحة", "عدد الأفراد", "الرمز السري", "تاريخ الإضافة"];
     
-    // Improved CSV conversion to handle special characters and commas
     const escapeCSV = (str: string | number) => {
       const stringValue = String(str);
       if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
@@ -275,7 +279,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Mobile Nav Overlay */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 md:hidden z-40">
         <button 
           onClick={() => setIsModalOpen(true)}
