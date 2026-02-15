@@ -20,15 +20,25 @@
         -webkit-tap-highlight-color: transparent;
         overflow-x: hidden;
       }
-      /* تحسين العرض على الهواتف الحديثة ذات النتوء (Notch) */
       @supports (padding: max(0px)) {
-        header {
-          padding-top: max(1rem, env(safe-area-inset-top));
-        }
+        header { padding-top: max(1rem, env(safe-area-inset-top)); }
       }
-      /* إخفاء شريط التمرير */
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      
+      /* نمط بسيط لإظهار رسالة خطأ إذا لم يعمل التطبيق */
+      #error-display {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: white;
+        z-index: 9999;
+        padding: 2rem;
+        text-align: center;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
     </style>
   <script type="importmap">
 {
@@ -37,20 +47,36 @@
     "react-dom": "https://esm.sh/react-dom@19.0.0",
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
     "lucide-react": "https://esm.sh/lucide-react@0.460.0",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
-    <!-- تحميل ملف التشغيل الأساسي -->
+    <div id="error-display">
+      <h2 style="color: #ef4444; font-weight: 800;">عذراً، حدث خطأ أثناء تشغيل التطبيق</h2>
+      <p style="color: #64748b; margin-top: 1rem;">يرجى تحديث الصفحة أو المحاولة من متصفح آخر.</p>
+      <button onclick="location.reload()" style="margin-top: 2rem; padding: 0.75rem 1.5rem; background: #0284c7; color: white; border-radius: 1rem; border: none; font-weight: bold;">تحديث الصفحة</button>
+    </div>
+
+    <!-- كود مراقبة الأخطاء -->
+    <script>
+      window.onerror = function(msg, url, line) {
+        document.getElementById('error-display').style.display = 'flex';
+        console.error("Error: " + msg + "\nurl: " + url + "\nline: " + line);
+        return false;
+      };
+    </script>
+
     <script type="module" src="index.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed', err));
+          navigator.serviceWorker.register('sw.js').then(() => {
+            console.log('SW registered');
+          }).catch(err => console.log('SW registration failed', err));
         });
       }
     </script>
